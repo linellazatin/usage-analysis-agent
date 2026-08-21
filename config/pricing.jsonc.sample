@@ -4,12 +4,19 @@
   "sources": {
     "aws-bedrock": {
       "enabled": false,
+      "priority": 1,
       "profile": "use1-sit",
       "region": "us-east-1",
       "refreshDays": 7
     },
+    "pi-models-store": {
+      "enabled": false,
+      "priority": 2,
+      "refreshDays": 15
+    },
     "models-dev": {
       "enabled": false,
+      "priority": 3,
       "url": "https://models.dev/api.json",
       "refreshDays": 7
     }

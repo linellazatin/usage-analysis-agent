@@ -6,6 +6,7 @@ import argparse
 import sqlite3
 import os
 import re
+import ssl
 import subprocess
 import urllib.request
 import urllib.error
@@ -88,42 +89,21 @@ class PricingResolver:
         self.models: Dict[str, Dict[str, Any]] = {}
         self.fetched_at: Dict[str, str] = {}
         self.warnings: List[str] = []
-        self._load_local_catalogs()
-        self._load_remote_sources()
+        self._load_configured_sources()
 
     @staticmethod
     def _key(provider: Optional[str], model_id: str) -> str:
         return f"{provider}/{model_id}" if provider else model_id
 
     def _add(self, provider: Optional[str], model_id: str, pricing: Dict[str, float],
-             source: str, fetched_at: Optional[str] = None):
+             source: str, fetched_at: Optional[str] = None, priority: int = 100):
         if not model_id:
             return
         for key in (self._key(provider, model_id), model_id, _normalise_model(model_id)):
-            self.models.setdefault(key, {"pricing": pricing, "source": source,
-                                         "fetched_at": fetched_at})
-
-    def _load_local_catalogs(self):
-        for name in ("models.json", "models-store.json"):
-            path = Path.home() / ".pi" / "agent" / name
-            if not path.exists():
-                continue
-            try:
-                data = json.loads(path.read_text())
-                providers = data.get("providers", data)
-                if not isinstance(providers, dict):
-                    continue
-                for provider, provider_data in providers.items():
-                    models = provider_data.get("models", []) if isinstance(provider_data, dict) else []
-                    if isinstance(models, dict):
-                        models = [{"id": model_id, **details} for model_id, details in models.items()]
-                    for model in models:
-                        if isinstance(model, dict):
-                            pricing = _pricing_values(model)
-                            if pricing:
-                                self._add(provider, model.get("id", ""), pricing, f"pi-{name}")
-            except (OSError, json.JSONDecodeError):
-                self.warnings.append(f"Could not read {path}")
+            existing = self.models.get(key)
+            if existing is None or priority < existing["priority"]:
+                self.models[key] = {"pricing": pricing, "source": source,
+                                    "fetched_at": fetched_at, "priority": priority}
 
     def _cache_path(self, source: str) -> Path:
         return self.cache_dir / f"pricing-{source}.json"
@@ -146,14 +126,20 @@ class PricingResolver:
                 if isinstance(pricing, dict):
                     provider, _, model_id = key.partition("/")
                     self._add(provider if model_id else None, model_id or provider,
-                              pricing, source, fetched)
+                              pricing, source, fetched, data.get("priority", 100))
             self.fetched_at[source] = fetched
             return True
         except (OSError, json.JSONDecodeError, TypeError):
             return False
 
-    def _load_remote_sources(self):
-        for source, settings in self.config.get("sources", {}).items():
+    def _load_configured_sources(self):
+        sources = self.config.get("sources", {})
+        configured = sorted(
+            ((source, settings) for source, settings in sources.items()
+             if isinstance(settings, dict) and settings.get("enabled")),
+            key=lambda item: (int(item[1].get("priority", 100)), item[0]),
+        )
+        for source, settings in configured:
             if not isinstance(settings, dict) or not settings.get("enabled"):
                 continue
             cache_path = self._cache_path(source)
@@ -173,6 +159,7 @@ class PricingResolver:
                     "schema_version": self.SCHEMA_VERSION,
                     "source": source,
                     "fetched_at": now,
+                    "priority": int(settings.get("priority", 100)),
                     "config": {k: v for k, v in settings.items() if k not in ("token", "apiKey")},
                     "models": normalized_models,
                 }, indent=2))
@@ -193,9 +180,55 @@ class PricingResolver:
                 raise RuntimeError(result.stderr.strip() or "aws command failed")
             return self._parse_aws_pricing(json.loads(result.stdout), settings.get("region"))
         if source == "models-dev":
-            with urllib.request.urlopen(settings["url"], timeout=30) as response:
+            request = urllib.request.Request(
+                settings["url"],
+                headers={"User-Agent": "usage-analysis/1.0"},
+            )
+            with urllib.request.urlopen(
+                request, context=self._ssl_context(), timeout=30
+            ) as response:
                 return self._parse_models_dev(json.loads(response.read()))
+        if source == "pi-models-store":
+            path = Path.home() / ".pi" / "agent" / "models-store.json"
+            return self._parse_pi_models_store(json.loads(path.read_text()))
         raise ValueError(f"unsupported pricing source: {source}")
+
+    @staticmethod
+    def _parse_pi_models_store(data: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+        models = {}
+        for provider, provider_data in data.items():
+            if not isinstance(provider_data, dict):
+                continue
+            provider_models = provider_data.get("models", [])
+            if isinstance(provider_models, dict):
+                provider_models = [
+                    {"id": model_id, **details}
+                    for model_id, details in provider_models.items()
+                ]
+            for model in provider_models:
+                if not isinstance(model, dict):
+                    continue
+                pricing = _pricing_values(model)
+                if pricing and model.get("id"):
+                    models[f"{provider}/{model['id']}"] = pricing
+        return models
+
+    @staticmethod
+    def _ssl_context() -> ssl.SSLContext:
+        """Use verified system certificates when the Python framework path is stale."""
+        candidates = [
+            os.environ.get("SSL_CERT_FILE"),
+            "/etc/ssl/cert.pem",
+            "/opt/homebrew/etc/openssl@3/cert.pem",
+            ssl.get_default_verify_paths().cafile,
+        ]
+        for cafile in candidates:
+            if cafile and Path(cafile).exists():
+                try:
+                    return ssl.create_default_context(cafile=cafile)
+                except ssl.SSLError:
+                    continue
+        return ssl.create_default_context()
 
     @staticmethod
     def _parse_aws_pricing(data: Dict[str, Any], region: Optional[str] = None) -> Dict[str, Dict[str, float]]:
@@ -1103,7 +1136,20 @@ def print_single_agent_report(agent: str, usages: List[UsageEntry],
         if model_data['cost'] > 0:
             pct = (model_data['cost'] / actual_cost * 100) if actual_cost > 0 else 0
             print(f"  {model_id}: ${model_data['cost']:>12,.2f} ({pct:.1f}%)")
+    source_paths = {
+        "aws-bedrock": "cache/pricing-aws-bedrock.json",
+        "pi-models-store": "cache/pricing-pi-models-store.json",
+        "models-dev": "cache/pricing-models-dev.json",
+        "override": "config/pricing.jsonc",
+        "recorded": "recorded usage data",
+    }
+    pricing_sources = sorted(stats.pricing_sources) or ["unknown"]
+    source_details = ", ".join(
+        f"{source} ({source_paths.get(source, 'no cache path')})"
+        for source in pricing_sources
+    )
     print("=" * 80)
+    print(f"Model Pricing Source: {source_details}")
 
 
 def print_summary_comparison(all_stats: Dict[str, AgentStats]):
