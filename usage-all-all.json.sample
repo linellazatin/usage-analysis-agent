@@ -1,0 +1,858 @@
+{
+  "analysis_period": {
+    "start": "ALL TIME",
+    "end": "2026-08-21",
+    "label": "ALL TIME (data from 2026-08-07)"
+  },
+  "agents_analyzed": [
+    "claude-code",
+    "opencode",
+    "pi",
+    "codex"
+  ],
+  "agent_stats": {
+    "claude-code": {
+      "model_requests": 5638,
+      "model_turns": 2199,
+      "model_tool_calls": 3355,
+      "total_input_tokens": 2815001,
+      "total_output_tokens": 359549,
+      "total_cache_read_tokens": 41473257,
+      "total_cache_write_tokens": 4402958,
+      "total_tokens": 49050765,
+      "total_cost": 36.167318900000005,
+      "daily_cost": 36.167318900000005,
+      "weekly_cost": 253.17123230000004,
+      "monthly_cost": 1085.019567,
+      "quarterly_cost": 3255.0587010000004,
+      "yearly_cost": 13201.071398500002,
+      "usage_entries": 5,
+      "unique_models": [
+        "claude-sonnet-4-6",
+        "claude-sonnet-5",
+        "claude-haiku-4-5-20251001",
+        "zai.glm-5",
+        "moonshotai.kimi-k2.5"
+      ],
+      "model_breakdown": {
+        "claude-sonnet-4-6": {
+          "input": 1603,
+          "output": 263350,
+          "cache_read": 38346815,
+          "cache_write": 3670196,
+          "cost": 29.2223385,
+          "model_requests": 1570,
+          "model_turns": 682,
+          "model_tool_calls": 896
+        },
+        "zai.glm-5": {
+          "input": 2661881,
+          "output": 35742,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 2.7762554,
+          "model_requests": 2549,
+          "model_turns": 896,
+          "model_tool_calls": 1552
+        },
+        "moonshotai.kimi-k2.5": {
+          "input": 151369,
+          "output": 557,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0924924,
+          "model_requests": 5,
+          "model_turns": 3,
+          "model_tool_calls": 1
+        },
+        "claude-haiku-4-5-20251001": {
+          "input": 144,
+          "output": 47838,
+          "cache_read": 3126442,
+          "cache_write": 374212,
+          "cost": 3.0592295999999997,
+          "model_requests": 1512,
+          "model_turns": 617,
+          "model_tool_calls": 905
+        },
+        "claude-sonnet-5": {
+          "input": 4,
+          "output": 12062,
+          "cache_read": 0,
+          "cache_write": 358550,
+          "cost": 1.0170029999999999,
+          "model_requests": 2,
+          "model_turns": 1,
+          "model_tool_calls": 1
+        }
+      },
+      "daily_activity": {}
+    },
+    "opencode": {
+      "model_requests": 1676,
+      "model_turns": 1676,
+      "model_tool_calls": 1885,
+      "total_input_tokens": 4093827,
+      "total_output_tokens": 1266663,
+      "total_cache_read_tokens": 178256544,
+      "total_cache_write_tokens": 32864796,
+      "total_tokens": 216481830,
+      "total_cost": 169.9073008999997,
+      "daily_cost": 12.136235778571407,
+      "weekly_cost": 84.95365044999986,
+      "monthly_cost": 364.08707335714223,
+      "quarterly_cost": 1092.2612200714266,
+      "yearly_cost": 4429.726059178563,
+      "usage_entries": 39,
+      "unique_models": [
+        "claude-opus-5",
+        "claude-sonnet-4-6",
+        "glm-5",
+        "claude-sonnet-5",
+        "claude-haiku-4-5",
+        "claude-haiku-4-5-20251001-v1:0",
+        "5"
+      ],
+      "model_breakdown": {
+        "claude-haiku-4-5": {
+          "input": 224778,
+          "output": 16560,
+          "cache_read": 2058151,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 46,
+          "model_turns": 46,
+          "model_tool_calls": 66
+        },
+        "claude-sonnet-4-6": {
+          "input": 360880,
+          "output": 281538,
+          "cache_read": 36105952,
+          "cache_write": 3843171,
+          "cost": 30.32499965000001,
+          "model_requests": 63,
+          "model_turns": 63,
+          "model_tool_calls": 702
+        },
+        "claude-haiku-4-5-20251001-v1:0": {
+          "input": 29,
+          "output": 1944,
+          "cache_read": 187123,
+          "cache_write": 40368,
+          "cost": 0.0789213,
+          "model_requests": 0,
+          "model_turns": 0,
+          "model_tool_calls": 7
+        },
+        "claude-opus-5": {
+          "input": 448431,
+          "output": 753683,
+          "cache_read": 131109344,
+          "cache_write": 26945015,
+          "cost": 128.3549293499998,
+          "model_requests": 0,
+          "model_turns": 0,
+          "model_tool_calls": 861
+        },
+        "claude-sonnet-5": {
+          "input": 230,
+          "output": 196309,
+          "cache_read": 8795974,
+          "cache_write": 2036242,
+          "cost": 8.813349800000001,
+          "model_requests": 0,
+          "model_turns": 0,
+          "model_tool_calls": 176
+        },
+        "5": {
+          "input": 1940168,
+          "output": 7619,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 1.1869578,
+          "model_requests": 0,
+          "model_turns": 0,
+          "model_tool_calls": 45
+        },
+        "glm-5": {
+          "input": 1119311,
+          "output": 9010,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 1.1481430000000001,
+          "model_requests": 1,
+          "model_turns": 1,
+          "model_tool_calls": 28
+        },
+        "qwen3-coder-next": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 1,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-sonnet-4-6": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 809,
+          "model_turns": 809,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-opus-4-8": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 78,
+          "model_turns": 78,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 8,
+          "model_turns": 8,
+          "model_tool_calls": 0
+        },
+        "zai.glm-5": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 17,
+          "model_turns": 17,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-sonnet-5": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 582,
+          "model_turns": 582,
+          "model_tool_calls": 0
+        },
+        "moonshotai.kimi-k2.5": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 46,
+          "model_turns": 46,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-opus-5": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 25,
+          "model_turns": 25,
+          "model_tool_calls": 0
+        }
+      },
+      "daily_activity": {
+        "2026-08-08": {
+          "tokens": 1638139,
+          "cost": 0.0
+        },
+        "2026-08-10": {
+          "tokens": 33924168,
+          "cost": 22.11224160000001
+        },
+        "2026-08-12": {
+          "tokens": 161521637,
+          "cost": 130.0635122999998
+        },
+        "2026-08-13": {
+          "tokens": 2827944,
+          "cost": 3.9606419000000006
+        },
+        "2026-08-18": {
+          "tokens": 3473547,
+          "cost": 2.9954448
+        },
+        "2026-08-19": {
+          "tokens": 10209396,
+          "cost": 8.06927025
+        },
+        "2026-08-20": {
+          "tokens": 2886999,
+          "cost": 2.70619005
+        }
+      }
+    },
+    "pi": {
+      "model_requests": 3195,
+      "model_turns": 388,
+      "model_tool_calls": 3095,
+      "total_input_tokens": 121759806,
+      "total_output_tokens": 1601521,
+      "total_cache_read_tokens": 240030320,
+      "total_cache_write_tokens": 37900981,
+      "total_tokens": 401292628,
+      "total_cost": 372.61091984099966,
+      "daily_cost": 24.840727989399976,
+      "weekly_cost": 173.88509592579985,
+      "monthly_cost": 745.2218396819993,
+      "quarterly_cost": 2235.665519045998,
+      "yearly_cost": 9066.865716130991,
+      "usage_entries": 3195,
+      "unique_models": [
+        "local.gemma4-12b",
+        "local.qwen3.5-9b-gen",
+        "claude-sonnet-4-6",
+        "deepseek.v3.2",
+        "claude-sonnet-5",
+        "claude-haiku-4-5",
+        "global.anthropic.claude-sonnet-5",
+        "zai.glm-5",
+        "gpt-5.6-luna",
+        "qwen.qwen3-coder-next",
+        "global.anthropic.claude-opus-4-8",
+        "qwen3-coder-next",
+        "auto/coding",
+        "global.openai.gpt-5.6-luna",
+        "local.ornith1-9b",
+        "qwen3-coder-480b-a35b-v1",
+        "minimax.minimax-m2.5",
+        "global.openai.gpt-5.6-terra",
+        "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "openrouter/free",
+        "glm-5",
+        "global.anthropic.claude-sonnet-4-6",
+        "opencoding-free-ish",
+        "auto",
+        "moonshotai.kimi-k2.5",
+        "auto/best-free"
+      ],
+      "model_breakdown": {
+        "claude-haiku-4-5": {
+          "input": 3265988,
+          "output": 53554,
+          "cache_read": 511227,
+          "cache_write": 387237,
+          "cost": 4.068926950000001,
+          "model_requests": 85,
+          "model_turns": 9,
+          "model_tool_calls": 0
+        },
+        "": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 0,
+          "model_turns": 0,
+          "model_tool_calls": 3095
+        },
+        "global.anthropic.claude-sonnet-4-6": {
+          "input": 856,
+          "output": 381299,
+          "cache_read": 71839166,
+          "cache_write": 13606189,
+          "cost": 78.29701154999995,
+          "model_requests": 680,
+          "model_turns": 88,
+          "model_tool_calls": 0
+        },
+        "qwen.qwen3-coder-next": {
+          "input": 18786479,
+          "output": 69619,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 4.25833958,
+          "model_requests": 215,
+          "model_turns": 12,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+          "input": 274,
+          "output": 10533,
+          "cache_read": 2137707,
+          "cache_write": 608019,
+          "cost": 1.0267334499999998,
+          "model_requests": 23,
+          "model_turns": 3,
+          "model_tool_calls": 0
+        },
+        "deepseek.v3.2": {
+          "input": 2132539,
+          "output": 14649,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 1.34927483,
+          "model_requests": 31,
+          "model_turns": 3,
+          "model_tool_calls": 0
+        },
+        "moonshotai.kimi-k2.5": {
+          "input": 7261008,
+          "output": 27806,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 4.4400227999999995,
+          "model_requests": 84,
+          "model_turns": 16,
+          "model_tool_calls": 0
+        },
+        "minimax.minimax-m2.5": {
+          "input": 2129331,
+          "output": 5171,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.6450045,
+          "model_requests": 20,
+          "model_turns": 5,
+          "model_tool_calls": 0
+        },
+        "zai.glm-5": {
+          "input": 11862069,
+          "output": 36009,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 11.977297800000004,
+          "model_requests": 125,
+          "model_turns": 13,
+          "model_tool_calls": 0
+        },
+        "qwen3-coder-480b-a35b-v1": {
+          "input": 3410201,
+          "output": 13211,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 1.55837025,
+          "model_requests": 37,
+          "model_turns": 3,
+          "model_tool_calls": 0
+        },
+        "global.openai.gpt-5.6-terra": {
+          "input": 410723,
+          "output": 875,
+          "cache_read": 295646,
+          "cache_write": 135111,
+          "cost": 1.35173797,
+          "model_requests": 6,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "claude-sonnet-4-6": {
+          "input": 45684749,
+          "output": 275515,
+          "cache_read": 7427150,
+          "cache_write": 1702683,
+          "cost": 149.8001782500001,
+          "model_requests": 646,
+          "model_turns": 112,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-sonnet-5": {
+          "input": 1102,
+          "output": 407063,
+          "cache_read": 110671599,
+          "cache_write": 18631502,
+          "cost": 72.78590879999996,
+          "model_requests": 551,
+          "model_turns": 58,
+          "model_tool_calls": 0
+        },
+        "gpt-5.6-luna": {
+          "input": 2,
+          "output": 167,
+          "cache_read": 0,
+          "cache_write": 117140,
+          "cost": 0.005019999999999999,
+          "model_requests": 1,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "claude-sonnet-5": {
+          "input": 5709479,
+          "output": 57248,
+          "cache_read": 1847694,
+          "cache_write": 415857,
+          "cost": 13.4006193,
+          "model_requests": 90,
+          "model_turns": 6,
+          "model_tool_calls": 0
+        },
+        "local.ornith1-9b": {
+          "input": 125083,
+          "output": 16507,
+          "cache_read": 266466,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 17,
+          "model_turns": 3,
+          "model_tool_calls": 0
+        },
+        "auto": {
+          "input": 97646,
+          "output": 2248,
+          "cache_read": 152064,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 8,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "local.qwen3.5-9b-gen": {
+          "input": 1153012,
+          "output": 73882,
+          "cache_read": 10708515,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 204,
+          "model_turns": 17,
+          "model_tool_calls": 0
+        },
+        "qwen3-coder-next": {
+          "input": 4691405,
+          "output": 7022,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 2.3541289000000005,
+          "model_requests": 55,
+          "model_turns": 7,
+          "model_tool_calls": 0
+        },
+        "auto/coding": {
+          "input": 3699995,
+          "output": 18252,
+          "cache_read": 2307494,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 59,
+          "model_turns": 6,
+          "model_tool_calls": 0
+        },
+        "opencoding-free-ish": {
+          "input": 821734,
+          "output": 37566,
+          "cache_read": 2582464,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 31,
+          "model_turns": 5,
+          "model_tool_calls": 0
+        },
+        "auto/best-free": {
+          "input": 1896349,
+          "output": 7451,
+          "cache_read": 16128,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 23,
+          "model_turns": 3,
+          "model_tool_calls": 0
+        },
+        "openrouter/free": {
+          "input": 122560,
+          "output": 978,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 2,
+          "model_turns": 0,
+          "model_tool_calls": 0
+        },
+        "global.anthropic.claude-opus-4-8": {
+          "input": 172,
+          "output": 39819,
+          "cache_read": 22675606,
+          "cache_write": 1548690,
+          "cost": 22.013450500000005,
+          "model_requests": 86,
+          "model_turns": 4,
+          "model_tool_calls": 0
+        },
+        "glm-5": {
+          "input": 1285345,
+          "output": 8441,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 1.3123562,
+          "model_requests": 27,
+          "model_turns": 4,
+          "model_tool_calls": 0
+        },
+        "local.gemma4-12b": {
+          "input": 46014,
+          "output": 5814,
+          "cache_read": 66436,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 5,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "global.openai.gpt-5.6-luna": {
+          "input": 7165691,
+          "output": 30822,
+          "cache_read": 6524958,
+          "cache_write": 748553,
+          "cost": 1.9665382109999994,
+          "model_requests": 84,
+          "model_turns": 7,
+          "model_tool_calls": 0
+        }
+      },
+      "daily_activity": {
+        "2026-08-09": {
+          "tokens": 27266746,
+          "cost": 26.912249599999992
+        },
+        "2026-08-12": {
+          "tokens": 1414940,
+          "cost": 1.1734242
+        },
+        "2026-08-20": {
+          "tokens": 57706457,
+          "cost": 42.63517791999999
+        },
+        "2026-08-07": {
+          "tokens": 5535270,
+          "cost": 5.76640435
+        },
+        "2026-08-15": {
+          "tokens": 74064243,
+          "cost": 72.77325460000002
+        },
+        "2026-08-16": {
+          "tokens": 93675120,
+          "cost": 53.85248369999997
+        },
+        "2026-08-17": {
+          "tokens": 31957817,
+          "cost": 12.38216414
+        },
+        "2026-08-10": {
+          "tokens": 12686732,
+          "cost": 38.870639999999995
+        },
+        "2026-08-08": {
+          "tokens": 28997980,
+          "cost": 67.74838764999996
+        },
+        "2026-08-13": {
+          "tokens": 11567600,
+          "cost": 28.436404649999997
+        },
+        "2026-08-18": {
+          "tokens": 1301018,
+          "cost": 0.29182822
+        },
+        "2026-08-19": {
+          "tokens": 40648681,
+          "cost": 19.801962599999996
+        },
+        "2026-08-21": {
+          "tokens": 14470024,
+          "cost": 1.9665382109999994
+        }
+      }
+    },
+    "codex": {
+      "model_requests": 956,
+      "model_turns": 189,
+      "model_tool_calls": 926,
+      "total_input_tokens": 90500207,
+      "total_output_tokens": 489242,
+      "total_cache_read_tokens": 5115888,
+      "total_cache_write_tokens": 551783,
+      "total_tokens": 90991330,
+      "total_cost": 175.9349034200001,
+      "daily_cost": 11.72899356133334,
+      "weekly_cost": 82.10295492933338,
+      "monthly_cost": 351.8698068400002,
+      "quarterly_cost": 1055.6094205200006,
+      "yearly_cost": 4281.082649886669,
+      "usage_entries": 956,
+      "unique_models": [
+        "local.gemma4-12b",
+        "claude-sonnet-4-6",
+        "claude-sonnet-5",
+        "claude-haiku-4-5",
+        "kimi-k2-5",
+        "openai.gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "glm-5"
+      ],
+      "model_breakdown": {
+        "unknown": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 0,
+          "model_turns": 27,
+          "model_tool_calls": 0
+        },
+        "openai.gpt-5.5": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 0,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "openai.gpt-5.6-terra": {
+          "input": 273495,
+          "output": 1739,
+          "cache_read": 0,
+          "cache_write": 273479,
+          "cost": 1.37671105,
+          "model_requests": 8,
+          "model_turns": 0,
+          "model_tool_calls": 11
+        },
+        "kimi-k2-5": {
+          "input": 19780776,
+          "output": 74367,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 12.091566600000002,
+          "model_requests": 187,
+          "model_turns": 23,
+          "model_tool_calls": 184
+        },
+        "gpt-oss-120b": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 0,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "claude-sonnet-5": {
+          "input": 27412566,
+          "output": 149517,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 56.32030200000004,
+          "model_requests": 221,
+          "model_turns": 32,
+          "model_tool_calls": 206
+        },
+        "claude-sonnet-4-6": {
+          "input": 21684722,
+          "output": 102121,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 66.585981,
+          "model_requests": 243,
+          "model_turns": 46,
+          "model_tool_calls": 253
+        },
+        "local.gemma4-12b": {
+          "input": 955200,
+          "output": 21620,
+          "cache_read": 867503,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 42,
+          "model_turns": 21,
+          "model_tool_calls": 19
+        },
+        "openai.gpt-oss-120b-1:0": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 0.0,
+          "model_requests": 0,
+          "model_turns": 1,
+          "model_tool_calls": 0
+        },
+        "glm-5": {
+          "input": 5379582,
+          "output": 10858,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 5.396954799999999,
+          "model_requests": 81,
+          "model_turns": 11,
+          "model_tool_calls": 102
+        },
+        "claude-haiku-4-5": {
+          "input": 10451695,
+          "output": 107041,
+          "cache_read": 0,
+          "cache_write": 0,
+          "cost": 32.96070000000001,
+          "model_requests": 101,
+          "model_turns": 12,
+          "model_tool_calls": 89
+        },
+        "gpt-5.6-luna": {
+          "input": 4562171,
+          "output": 21979,
+          "cache_read": 4248385,
+          "cache_write": 278304,
+          "cost": 1.20268797,
+          "model_requests": 73,
+          "model_turns": 14,
+          "model_tool_calls": 62
+        }
+      },
+      "daily_activity": {
+        "2026-08-20": {
+          "tokens": 275234,
+          "cost": 1.37671105
+        },
+        "2026-08-17": {
+          "tokens": 15332513,
+          "cost": 9.366970199999999
+        },
+        "2026-08-10": {
+          "tokens": 5933880,
+          "cost": 15.259008
+        },
+        "2026-08-07": {
+          "tokens": 10765280,
+          "cost": 33.193947000000016
+        },
+        "2026-08-08": {
+          "tokens": 9725331,
+          "cost": 7.948103200000001
+        },
+        "2026-08-15": {
+          "tokens": 34810526,
+          "cost": 87.11947097599992
+        },
+        "2026-08-16": {
+          "tokens": 4473765,
+          "cost": 1.9766749940000001
+        },
+        "2026-08-14": {
+          "tokens": 9674801,
+          "cost": 19.69401799999999
+        }
+      }
+    }
+  },
+  "combined_summary": {
+    "total_tokens": 757816553,
+    "total_cost": 754.6204430609995
+  }
+}
