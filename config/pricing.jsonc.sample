@@ -5,7 +5,7 @@
     "aws-bedrock": {
       "enabled": false,
       "priority": 1,
-      "profile": "use1-sit",
+      "profile": "use1-personal",
       "region": "us-east-1",
       "refreshDays": 7
     },
