@@ -1,0 +1,25 @@
+{
+  // Remote sources are disabled by default in the sample. Copy to pricing.jsonc
+  // and enable only the sources you trust.
+  "sources": {
+    "aws-bedrock": {
+      "enabled": false,
+      "profile": "use1-sit",
+      "region": "us-east-1",
+      "refreshDays": 7
+    },
+    "models-dev": {
+      "enabled": false,
+      "url": "https://models.dev/api.json",
+      "refreshDays": 7
+    }
+  },
+  "overrides": {
+    // "litellm-proxy/claude-sonnet-4-6": {
+    //   "input": 2.0,
+    //   "output": 10.0,
+    //   "cacheRead": 0.2,
+    //   "cacheWrite": 2.5
+    // }
+  }
+}

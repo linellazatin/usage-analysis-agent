@@ -5,6 +5,10 @@ import json
 import argparse
 import sqlite3
 import os
+import re
+import subprocess
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from collections import defaultdict
 from pathlib import Path
@@ -39,237 +43,251 @@ def should_colorize() -> bool:
 
 
 # ============================================================================
-# MODEL PRICING (loaded from ~/.cache/amazon-bedrock-pricing.json - SINGLE SOURCE OF TRUTH)
+# MODEL PRICING
 # ============================================================================
 
-class PricingLoader:
-    """Load model pricing from AWS Pricing API cache as single source of truth."""
-    
-    _pricing_cache: Dict[str, Dict[str, float]] = None
-    _loaded = False
-    _cache_dir = Path.home() / ".cache"
-    _aws_pricing_cache_file = _cache_dir / "amazon-bedrock-pricing.json"
-    _cache_max_age_days = 7
-    
-    @classmethod
-    def _should_refresh_aws_cache(cls) -> bool:
-        """Check if AWS pricing cache needs refresh."""
-        if not cls._aws_pricing_cache_file.exists():
-            return True
-        
-        try:
-            with open(cls._aws_pricing_cache_file) as f:
-                cache_data = json.load(f)
-            
-            cached_date_str = cache_data.get('lastUpdated', '')
-            if not cached_date_str:
-                return True
-            
-            cached_date = datetime.fromisoformat(cached_date_str)
-            age = datetime.now() - cached_date
-            return age >= timedelta(days=cls._cache_max_age_days)
-        except (json.JSONDecodeError, ValueError, KeyError):
-            return True
-    
-    @classmethod
-    def _fetch_aws_pricing(cls) -> Dict[str, Dict]:
-        """Fetch pricing from AWS Pricing API and supplement with models-store.json data."""
-        # Check cache first
-        if not cls._should_refresh_aws_cache():
-            try:
-                with open(cls._aws_pricing_cache_file) as f:
-                    cache_data = json.load(f)
-                return cache_data.get('models', {})
-            except (json.JSONDecodeError, KeyError):
-                pass
-        
-        # Need to fetch from AWS
-        import subprocess
-        aws_models = {}
-        
-        try:
-            # Fetch from AWS Pricing API
-            result = subprocess.run(
-                ['aws', 'pricing', 'get-products', 
-                 '--profile', 'use1-sit',
-                 '--region', 'us-east-1',
-                 '--service-code', 'AmazonBedrock'],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-            
-            if result.returncode == 0:
-                pricing_data = json.loads(result.stdout)
-                aws_models = cls._parse_aws_pricing(pricing_data)
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
-            pass
-        except Exception as e:
-            print(f"Warning: Could not fetch AWS pricing: {e}")
-        
-        # Merge with models-store.json data (fill gaps for newer models)
-        model_store_models = {}
-        model_store_path = Path.home() / ".pi" / "agent" / "models-store.json"
-        if model_store_path.exists():
-            try:
-                with open(model_store_path) as f:
-                    data = json.load(f)
-                
-                bedrock_models = data.get('amazon-bedrock', {}).get('models', [])
-                
-                for model in bedrock_models:
-                    model_id = model.get('id', '')
-                    cost = model.get('cost', {})
-                    
-                    if model_id and cost:
-                        # Only add if not already from AWS Pricing API
-                        if model_id not in aws_models:
-                            model_store_models[model_id] = {
-                                'input': cost.get('input', 0),
-                                'output': cost.get('output', 0),
-                                'cacheRead': cost.get('cacheRead', 0),
-                                'cacheWrite': cost.get('cacheWrite', 0)
-                            }
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Error loading models-store.json: {e}")
-        
-        # Combine AWS and models-store data
-        combined_models = {**aws_models, **model_store_models}
-        
-        # Create normalized versions
-        normalized_models = {}
-        for model_name, pricing in combined_models.items():
-            # Normalize model name to match our IDs
-            normalized = model_name.lower().replace(' ', '-').replace('.', '-')
-            if normalized not in combined_models:  # Avoid overwriting existing
-                normalized_models[normalized] = pricing
-                
-            # Create prefix-stripped versions
-            for prefix in ['global.', 'openai.', 'anthropic.', 'au.anthropic.', 'eu.anthropic.', 'us.anthropic.', 'jp.anthropic.', 'moonshotai.', 'minimax.', 'mistral.', 'meta.', 'google.', 'nvidia.', 'deepseek.']:
-                if model_name.startswith(prefix):
-                    short_id = model_name[len(prefix):]
-                    if short_id not in combined_models:
-                        normalized_models[short_id] = pricing
-        
-        # Merge everything
-        all_models = {**combined_models, **normalized_models}
-        
-        # Save to cache - THIS IS NOW THE SINGLE SOURCE OF TRUTH
-        cls._cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_data = {
-            'lastUpdated': datetime.now().isoformat(),
-            'source': 'combined-aws-and-models-store',
-            'models': all_models
+def load_jsonc(path: Path) -> Dict[str, Any]:
+    """Load JSON with //, /* */ comments and trailing commas."""
+    text = path.read_text()
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"(^|[^:])//.*", r"\1", text)
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    return json.loads(text)
+
+
+def _normalise_model(model_id: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(model_id).lower()).strip("-")
+
+
+def _pricing_values(value: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    cost = value.get("cost", value)
+    if not isinstance(cost, dict) or "input" not in cost or "output" not in cost:
+        return None
+    try:
+        return {
+            "input": float(cost.get("input", 0)),
+            "output": float(cost.get("output", 0)),
+            "cacheRead": float(cost.get("cacheRead", cost.get("cache_read", 0))),
+            "cacheWrite": float(cost.get("cacheWrite", cost.get("cache_write", 0))),
         }
-        with open(cls._aws_pricing_cache_file, 'w') as f:
-            json.dump(cache_data, f, indent=2)
-        
-        return all_models
-    
-    @classmethod
-    def _parse_aws_pricing(cls, pricing_data: Dict) -> Dict[str, Dict]:
-        """Parse AWS Pricing API response into model pricing dict."""
-        models = {}
-        
-        for item_str in pricing_data.get('PriceList', []):
-            try:
-                item = json.loads(item_str)
-                attrs = item.get('product', {}).get('attributes', {})
-                
-                region = attrs.get('regionCode', '')
-                model = attrs.get('model', '')
-                inference_type = attrs.get('inferenceType', '')
-                
-                if not model or region != 'us-east-1':
-                    continue
-                
-                # Get price
-                terms = item.get('terms', {}).get('OnDemand', {})
-                for term_data in terms.values():
-                    for pd_data in term_data.get('priceDimensions', {}).values():
-                        price_str = pd_data.get('pricePerUnit', {}).get('USD', '0')
-                        price_per_1k = float(price_str)
-                        price_per_million = price_per_1k * 1000
-                        
-                        # Determine token type
-                        if 'Input' in inference_type and 'Cache' not in inference_type and 'priority' not in inference_type.lower():
-                            token_type = 'input'
-                        elif 'Output' in inference_type:
-                            token_type = 'output'
-                        elif 'Cache read' in inference_type or 'cacheRead' in inference_type.lower():
-                            token_type = 'cacheRead'
-                        elif 'Cache write' in inference_type or 'Cache creation' in inference_type:
-                            token_type = 'cacheWrite'
-                        else:
-                            continue
-                        
-                        if model not in models:
-                            models[model] = {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}
-                        models[model][token_type] = price_per_million
-            except (json.JSONDecodeError, KeyError, ValueError):
-                continue
-        
-        return models
-    
-    @classmethod
-    def _load_pricing(cls) -> Dict[str, Dict[str, float]]:
-        """Load pricing data - USE AWS Pricing API cache AS SINGLE SOURCE OF TRUTH."""
-        if cls._loaded:
-            return cls._pricing_cache or {}
-        
-        cls._loaded = True
-        cls._pricing_cache = {}
-        
-        # ONLY source: AWS Pricing API cache (~/.cache/amazon-bedrock-pricing.json)
-        # This cache includes BOTH AWS Pricing API data AND models-store.json data
-        aws_models = cls._fetch_aws_pricing()
-        
-        # Use the cache as THE SINGLE SOURCE OF TRUTH
-        for model_name, pricing in aws_models.items():
-            cls._pricing_cache[model_name] = pricing
-        
-        # Add local model (no cost) - always present
-        cls._pricing_cache['local.gemma4-12b'] = {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}
-        
-        return cls._pricing_cache
-    
-    @classmethod
-    def get_pricing(cls, model_id: str) -> Optional[Dict[str, float]]:
-        """Get pricing for a specific model from AWS Pricing API cache."""
-        pricing = cls._load_pricing()
-        
-        # Try exact match
-        if model_id in pricing:
-            return pricing[model_id]
-        
-        # Try stripping prefixes (common provider prefixes)
-        for prefix in ['global.', 'openai.', 'anthropic.', 'au.anthropic.', 'eu.anthropic.', 'us.anthropic.', 'jp.anthropic.', 'moonshotai.', 'zai.', 'minimax.', 'mistral.', 'meta.', 'google.', 'nvidia.', 'deepseek.']:
-            if model_id.startswith(prefix):
-                short_id = model_id[len(prefix):]
-                if short_id in pricing:
-                    return pricing[short_id]
-        
+    except (TypeError, ValueError):
         return None
 
 
-def calculate_cost(input_tokens: int, output_tokens: int, cache_read_tokens: int, 
-                   cache_write_tokens: int, model_id: str) -> float:
-    """Calculate cost in USD based on token counts and model pricing from AWS Pricing API cache."""
-    pricing = PricingLoader.get_pricing(model_id)
-    
-    # Default pricing if model not found (conservative Claude-like estimate)
+class PricingResolver:
+    """Resolve configured, cached, and local model pricing without fallback guesses."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(self, config_path: Optional[Path] = None, cache_dir: Optional[Path] = None,
+                 force_refresh: bool = False):
+        self.config_path = config_path or Path(__file__).parent / "config" / "pricing.jsonc"
+        self.cache_dir = cache_dir or Path(__file__).parent / "cache"
+        self.force_refresh = force_refresh
+        self.config = load_jsonc(self.config_path) if self.config_path.exists() else {}
+        self.models: Dict[str, Dict[str, Any]] = {}
+        self.fetched_at: Dict[str, str] = {}
+        self.warnings: List[str] = []
+        self._load_local_catalogs()
+        self._load_remote_sources()
+
+    @staticmethod
+    def _key(provider: Optional[str], model_id: str) -> str:
+        return f"{provider}/{model_id}" if provider else model_id
+
+    def _add(self, provider: Optional[str], model_id: str, pricing: Dict[str, float],
+             source: str, fetched_at: Optional[str] = None):
+        if not model_id:
+            return
+        for key in (self._key(provider, model_id), model_id, _normalise_model(model_id)):
+            self.models.setdefault(key, {"pricing": pricing, "source": source,
+                                         "fetched_at": fetched_at})
+
+    def _load_local_catalogs(self):
+        for name in ("models.json", "models-store.json"):
+            path = Path.home() / ".pi" / "agent" / name
+            if not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text())
+                providers = data.get("providers", data)
+                if not isinstance(providers, dict):
+                    continue
+                for provider, provider_data in providers.items():
+                    models = provider_data.get("models", []) if isinstance(provider_data, dict) else []
+                    if isinstance(models, dict):
+                        models = [{"id": model_id, **details} for model_id, details in models.items()]
+                    for model in models:
+                        if isinstance(model, dict):
+                            pricing = _pricing_values(model)
+                            if pricing:
+                                self._add(provider, model.get("id", ""), pricing, f"pi-{name}")
+            except (OSError, json.JSONDecodeError):
+                self.warnings.append(f"Could not read {path}")
+
+    def _cache_path(self, source: str) -> Path:
+        return self.cache_dir / f"pricing-{source}.json"
+
+    def _cache_fresh(self, path: Path, refresh_days: int) -> bool:
+        try:
+            data = json.loads(path.read_text())
+            fetched = datetime.fromisoformat(data["fetched_at"])
+            return datetime.now() - fetched < timedelta(days=refresh_days)
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return False
+
+    def _load_cache(self, source: str) -> bool:
+        try:
+            data = json.loads(self._cache_path(source).read_text())
+            if data.get("schema_version") != self.SCHEMA_VERSION:
+                return False
+            fetched = data.get("fetched_at")
+            for key, pricing in data.get("models", {}).items():
+                if isinstance(pricing, dict):
+                    provider, _, model_id = key.partition("/")
+                    self._add(provider if model_id else None, model_id or provider,
+                              pricing, source, fetched)
+            self.fetched_at[source] = fetched
+            return True
+        except (OSError, json.JSONDecodeError, TypeError):
+            return False
+
+    def _load_remote_sources(self):
+        for source, settings in self.config.get("sources", {}).items():
+            if not isinstance(settings, dict) or not settings.get("enabled"):
+                continue
+            cache_path = self._cache_path(source)
+            fresh = cache_path.exists() and not self.force_refresh and self._cache_fresh(
+                cache_path, int(settings.get("refreshDays", 7)))
+            if fresh and self._load_cache(source):
+                continue
+            try:
+                models = self._fetch(source, settings)
+                normalized_models = dict(models)
+                for key, pricing in models.items():
+                    model_id = key.rsplit("/", 1)[-1]
+                    normalized_models.setdefault(_normalise_model(model_id), pricing)
+                now = datetime.now().isoformat()
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps({
+                    "schema_version": self.SCHEMA_VERSION,
+                    "source": source,
+                    "fetched_at": now,
+                    "config": {k: v for k, v in settings.items() if k not in ("token", "apiKey")},
+                    "models": normalized_models,
+                }, indent=2))
+                self._load_cache(source)
+            except Exception as exc:
+                if self._load_cache(source):
+                    self.warnings.append(f"{source} refresh failed; using cached pricing: {exc}")
+                else:
+                    self.warnings.append(f"{source} unavailable: {exc}")
+
+    def _fetch(self, source: str, settings: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+        if source == "aws-bedrock":
+            command = ["aws", "pricing", "get-products", "--profile",
+                       settings.get("profile", ""), "--region", settings.get("region", ""),
+                       "--service-code", "AmazonBedrock"]
+            result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+            if result.returncode:
+                raise RuntimeError(result.stderr.strip() or "aws command failed")
+            return self._parse_aws_pricing(json.loads(result.stdout), settings.get("region"))
+        if source == "models-dev":
+            with urllib.request.urlopen(settings["url"], timeout=30) as response:
+                return self._parse_models_dev(json.loads(response.read()))
+        raise ValueError(f"unsupported pricing source: {source}")
+
+    @staticmethod
+    def _parse_aws_pricing(data: Dict[str, Any], region: Optional[str] = None) -> Dict[str, Dict[str, float]]:
+        models: Dict[str, Dict[str, float]] = {}
+        for item_str in data.get("PriceList", []):
+            try:
+                item = json.loads(item_str) if isinstance(item_str, str) else item_str
+                attrs = item["product"]["attributes"]
+                if region and attrs.get("regionCode") not in (None, "", region):
+                    continue
+                model = attrs.get("model", "")
+                inference = attrs.get("inferenceType", "")
+                if not model:
+                    continue
+                token_type = ("input" if "Input" in inference and "Cache" not in inference
+                              and "priority" not in inference.lower() else
+                              "output" if "Output" in inference else
+                              "cacheRead" if "Cache read" in inference or "cacheRead" in inference
+                              else "cacheWrite" if "Cache write" in inference or "Cache creation" in inference
+                              else None)
+                if not token_type:
+                    continue
+                for term in item.get("terms", {}).get("OnDemand", {}).values():
+                    for dimension in term.get("priceDimensions", {}).values():
+                        price = float(dimension.get("pricePerUnit", {}).get("USD", 0)) * 1000
+                        models.setdefault(model, {"input": 0, "output": 0,
+                                                  "cacheRead": 0, "cacheWrite": 0})[token_type] = price
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+        return models
+
+    @staticmethod
+    def _parse_models_dev(data: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+        models = {}
+        for provider, provider_data in data.items():
+            if not isinstance(provider_data, dict):
+                continue
+            models_data = provider_data.get("models", {})
+            if isinstance(models_data, list):
+                models_data = {item.get("id", ""): item for item in models_data
+                               if isinstance(item, dict)}
+            for model_id, model_data in models_data.items():
+                pricing = _pricing_values(model_data) if isinstance(model_data, dict) else None
+                if pricing:
+                    models[f"{provider}/{model_id}"] = pricing
+        return models
+
+    def resolve(self, provider: Optional[str], model_id: str) -> Dict[str, Any]:
+        overrides = self.config.get("overrides", {})
+        for key in (self._key(provider, model_id), model_id):
+            pricing = _pricing_values(overrides.get(key, {})) if isinstance(overrides, dict) else None
+            if pricing:
+                return {"pricing": pricing, "status": "configured", "source": "override",
+                        "fetched_at": None}
+        for key in (self._key(provider, model_id), model_id, _normalise_model(model_id)):
+            if key in self.models:
+                return {"pricing": self.models[key]["pricing"], "status": "cached",
+                        "source": self.models[key]["source"],
+                        "fetched_at": self.models[key]["fetched_at"]}
+        return {"pricing": None, "status": "unknown", "source": None, "fetched_at": None}
+
+
+def calculate_cost(input_tokens: int, output_tokens: int, cache_read_tokens: int,
+                   cache_write_tokens: int, pricing: Optional[Dict[str, float]]) -> float:
     if not pricing:
-        pricing = {'input': 3, 'output': 15, 'cacheRead': 0.3, 'cacheWrite': 3.75}
-    
-    # Calculate cost (prices are per million tokens)
-    cost = (
-        (input_tokens / 1_000_000) * pricing['input'] +
-        (output_tokens / 1_000_000) * pricing['output'] +
-        (cache_read_tokens / 1_000_000) * pricing.get('cacheRead', 0) +
-        (cache_write_tokens / 1_000_000) * pricing.get('cacheWrite', 0)
-    )
-    
-    return cost
+        return 0.0
+    return sum((
+        input_tokens / 1_000_000 * pricing.get("input", 0),
+        output_tokens / 1_000_000 * pricing.get("output", 0),
+        cache_read_tokens / 1_000_000 * pricing.get("cacheRead", 0),
+        cache_write_tokens / 1_000_000 * pricing.get("cacheWrite", 0),
+    ))
+
+
+def apply_pricing(usages: List[UsageEntry], resolver: PricingResolver):
+    """Fill estimated costs while preserving recorded provider costs."""
+    for usage in usages:
+        if usage.is_metric_only:
+            continue
+        if usage.cost_status == "recorded":
+            usage.pricing_source = usage.pricing_source or "recorded"
+            continue
+        resolved = resolver.resolve(usage.provider, usage.model_id)
+        usage.cost = calculate_cost(
+            usage.input_tokens, usage.output_tokens,
+            usage.cache_read_tokens, usage.cache_write_tokens,
+            resolved["pricing"],
+        )
+        usage.cost_breakdown = {"total": usage.cost} if resolved["pricing"] else {}
+        usage.cost_status = resolved["status"]
+        usage.pricing_source = resolved["source"]
+        usage.pricing_fetched_at = resolved["fetched_at"]
 
 
 # ============================================================================
@@ -289,6 +307,10 @@ class UsageEntry:
     total_tokens: int
     cost: float
     cost_breakdown: Dict[str, float]
+    provider: Optional[str] = None
+    cost_status: str = "unknown"
+    pricing_source: Optional[str] = None
+    pricing_fetched_at: Optional[str] = None
     is_aggregated: bool = False
     session_id: Optional[str] = None
     model_requests: int = 0
@@ -328,6 +350,10 @@ class AgentStats:
     total_model_requests: int = 0
     total_model_turns: int = 0
     total_model_tool_calls: int = 0
+    unknown_cost_count: int = 0
+    cost_status_counts: Dict[str, int] = None
+    pricing_sources: Set[str] = None
+    pricing_fetched_at: Dict[str, str] = None
     
     def __post_init__(self):
         if self.unique_models is None:
@@ -336,6 +362,12 @@ class AgentStats:
             self.model_breakdown = {}
         if self.daily_activity is None:
             self.daily_activity = {}
+        if self.cost_status_counts is None:
+            self.cost_status_counts = {}
+        if self.pricing_sources is None:
+            self.pricing_sources = set()
+        if self.pricing_fetched_at is None:
+            self.pricing_fetched_at = {}
 
 
 # ============================================================================
@@ -417,13 +449,6 @@ class ClaudeCodeExtractor:
                 cache_write_tok = usage_data.get('cacheCreationInputTokens', 0)
                 total_tok = input_tok + output_tok + cache_read_tok + cache_write_tok
                 
-                # Calculate cost using Bedrock pricing (Claude Code costUSD is always 0)
-                cost = calculate_cost(
-                    input_tok, output_tok,
-                    cache_read_tok, cache_write_tok,
-                    model_id
-                )
-                
                 usages.append(UsageEntry(
                     agent='claude-code',
                     model_id=model_id,
@@ -433,8 +458,9 @@ class ClaudeCodeExtractor:
                     cache_read_tokens=cache_read_tok,
                     cache_write_tokens=cache_write_tok,
                     total_tokens=total_tok,
-                    cost=cost,
-                    cost_breakdown={'total': cost},
+                    cost=0.0,
+                    cost_breakdown={},
+                    provider='anthropic',
                     is_aggregated=True,
                     model_requests=transcript_metrics.get(model_id, UsageMetrics()).model_requests,
                     model_turns=transcript_metrics.get(model_id, UsageMetrics()).model_turns,
@@ -498,16 +524,20 @@ class OpenCodeExtractor:
             """):
                 try:
                     model_data = json.loads(model_json or '{}')
-                    model_id = model_data.get('id', 'unknown').split('.')[-1]
+                    model_id = model_data.get('id', 'unknown')
+                    provider = model_data.get('providerID') or model_data.get('provider')
                 except json.JSONDecodeError:
                     model_id = str(model_json or 'unknown')
+                    provider = None
                 total_tokens = sum((input_tokens or 0, output_tokens or 0, cache_read or 0, cache_write or 0))
                 usages.append(UsageEntry(
                     agent='opencode', model_id=model_id, timestamp=str(timestamp_ms),
                     input_tokens=input_tokens or 0, output_tokens=output_tokens or 0,
                     cache_read_tokens=cache_read or 0, cache_write_tokens=cache_write or 0,
                     total_tokens=total_tokens, cost=cost or 0.0,
-                    cost_breakdown={'total': cost or 0.0}, session_id=session_id
+                    cost_breakdown={'total': cost or 0.0} if cost is not None else {},
+                    provider=provider, cost_status='recorded' if cost is not None else 'unknown',
+                    session_id=session_id
                 ))
 
             messages = cursor.execute("""
@@ -526,6 +556,7 @@ class OpenCodeExtractor:
                     agent='opencode', model_id=message.get('modelID', 'unknown'), timestamp=str(timestamp_ms),
                     input_tokens=0, output_tokens=0, cache_read_tokens=0, cache_write_tokens=0,
                     total_tokens=0, cost=0.0, cost_breakdown={}, session_id=session_id,
+                    provider=message.get('providerID') or message.get('provider'),
                     model_requests=1,
                     model_turns=1 if message_roles.get(message.get('parentID')) == 'user' else 0,
                     is_metric_only=True
@@ -538,14 +569,17 @@ class OpenCodeExtractor:
             """).fetchall()
             for session_id, timestamp_ms, part_json, model_json in tools:
                 try:
-                    model_id = json.loads(model_json or '{}').get('id', 'unknown').split('.')[-1]
+                    model_data = json.loads(model_json or '{}')
+                    model_id = model_data.get('id', 'unknown')
+                    provider = model_data.get('providerID') or model_data.get('provider')
                 except json.JSONDecodeError:
                     model_id = 'unknown'
+                    provider = None
                 usages.append(UsageEntry(
                     agent='opencode', model_id=model_id, timestamp=str(timestamp_ms),
                     input_tokens=0, output_tokens=0, cache_read_tokens=0, cache_write_tokens=0,
                     total_tokens=0, cost=0.0, cost_breakdown={}, session_id=session_id,
-                    model_tool_calls=1, is_metric_only=True
+                    provider=provider, model_tool_calls=1, is_metric_only=True
                 ))
             conn.close()
             return usages
@@ -603,13 +637,17 @@ class PiAgentExtractor:
                 session_id = event.get('sessionId')
                 if usage and usage.get('totalTokens', 0) > 0:
                     model_id = msg.get('model', '')
+                    provider = msg.get('provider') or msg.get('providerID')
+                    recorded_cost = usage.get('cost', {}).get('total') if isinstance(usage.get('cost'), dict) else None
                     parent = by_id.get(event.get('parentId'), {}).get('message', {})
                     usages.append(UsageEntry(
                         agent='pi', model_id=model_id, timestamp=timestamp,
                         input_tokens=usage.get('input', 0), output_tokens=usage.get('output', 0),
                         cache_read_tokens=usage.get('cacheRead', 0), cache_write_tokens=usage.get('cacheWrite', 0),
-                        total_tokens=usage.get('totalTokens', 0), cost=usage.get('cost', {}).get('total', 0),
-                        cost_breakdown=usage.get('cost', {}), session_id=session_id,
+                        total_tokens=usage.get('totalTokens', 0), cost=recorded_cost or 0.0,
+                        cost_breakdown=usage.get('cost', {}) if recorded_cost is not None else {},
+                        provider=provider, cost_status='recorded' if recorded_cost is not None else 'unknown',
+                        session_id=session_id,
                         model_requests=1, model_turns=1 if parent.get('role') == 'user' else 0
                     ))
                 elif msg.get('role') == 'toolResult':
@@ -700,13 +738,6 @@ class CodexExtractor:
                                     cache_write_tok = last_usage.get('cache_write_input_tokens', 0)
                                     total_tok = last_usage.get('total_tokens', 0)
                                     
-                                    # Calculate cost using Bedrock pricing
-                                    cost = calculate_cost(
-                                        input_tok, output_tok, 
-                                        cache_read_tok, cache_write_tok,
-                                        current_model
-                                    )
-                                    
                                     usages.append(UsageEntry(
                                         agent='codex',
                                         model_id=current_model,
@@ -716,8 +747,9 @@ class CodexExtractor:
                                         cache_read_tokens=cache_read_tok,
                                         cache_write_tokens=cache_write_tok,
                                         total_tokens=total_tok,
-                                        cost=cost,
-                                        cost_breakdown={'total': cost},
+                                        cost=0.0,
+                                        cost_breakdown={},
+                                        provider='codex',
                                         is_aggregated=False,
                                         model_requests=1
                                     ))
@@ -823,6 +855,15 @@ class UsageAnalyzer:
             model_tokens[usage.model_id]['model_tool_calls'] += usage.model_tool_calls
             if usage.is_metric_only:
                 continue
+            stats.cost_status_counts[usage.cost_status] = (
+                stats.cost_status_counts.get(usage.cost_status, 0) + 1
+            )
+            if usage.cost_status == "unknown":
+                stats.unknown_cost_count += 1
+            if usage.pricing_source:
+                stats.pricing_sources.add(usage.pricing_source)
+            if usage.pricing_source and usage.pricing_fetched_at:
+                stats.pricing_fetched_at[usage.pricing_source] = usage.pricing_fetched_at
             stats.usage_entries += 1
             stats.unique_models.add(usage.model_id)
             
@@ -1054,6 +1095,7 @@ def print_single_agent_report(agent: str, usages: List[UsageEntry],
     
     print(f"\nActual reported cost:                  ${actual_cost:>14,.6f}")
     print(f"Cost by pricing model estimate:        ${actual_cost:>14,.6f}")
+    print(f"Unknown-cost entries:                  {stats.unknown_cost_count:>15,}")
     
     print("\nCost by top models:")
     top_models = sorted_models[:5] if len(sorted_models) > 5 else sorted_models
@@ -1139,6 +1181,8 @@ def parse_args() -> argparse.Namespace:
     # Output options
     parser.add_argument('--output', type=str,
                        help='Save results to file (JSON format)')
+    parser.add_argument('--refresh-pricing', action='store_true',
+                       help='Force refresh of enabled remote pricing sources')
     
     return parser.parse_args()
 
@@ -1195,6 +1239,9 @@ def main():
     
     # Get date range
     start_date, end_date, period_label = get_date_range(args)
+    resolver = PricingResolver(force_refresh=args.refresh_pricing)
+    for warning in resolver.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
     
     # Handle 'all' vs specific agents
     if 'all' in args.agent:
@@ -1227,6 +1274,7 @@ def main():
         else:
             print(f"Unknown agent: {agent}")
             continue
+        apply_pricing(usages, resolver)
         
         if usages:
             print(f"  Found {len(usages)} usage entries")
@@ -1277,6 +1325,11 @@ def main():
                 'label': period_label
             },
             'agents_analyzed': list(all_stats.keys()),
+            'pricing': {
+                'config_file': str(resolver.config_path),
+                'sources': resolver.fetched_at,
+                'warnings': resolver.warnings,
+            },
             'agent_stats': {}
         }
         
@@ -1291,6 +1344,10 @@ def main():
                 'total_cache_write_tokens': stats.total_cache_write_tokens,
                 'total_tokens': stats.total_tokens,
                 'total_cost': stats.total_cost,
+                'unknown_cost_count': stats.unknown_cost_count,
+                'cost_status_counts': stats.cost_status_counts,
+                'pricing_sources': sorted(stats.pricing_sources),
+                'pricing_fetched_at': stats.pricing_fetched_at,
                 'daily_cost': stats.daily_cost,
                 'weekly_cost': stats.weekly_cost,
                 'monthly_cost': stats.monthly_cost,

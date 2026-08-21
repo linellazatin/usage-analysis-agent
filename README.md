@@ -37,8 +37,8 @@ Agents are auto-detected when their expected local data exists.
 
 ### Optional
 
-- AWS CLI, configured with the `use1-sit` profile, for refreshing Amazon Bedrock pricing
-- Pi `models-store.json` at `~/.pi/agent/models-store.json`, used to supplement pricing data when available
+- AWS CLI, if `aws-bedrock` is enabled in `config/pricing.jsonc`
+- Pi `models.json` or `models-store.json` at `~/.pi/agent/`, used as local catalogs
 
 The script uses only Python standard-library modules. There is no `pip install` step and no `requirements.txt`.
 
@@ -95,6 +95,20 @@ python3 usage_analysis_agent.py \
 
 `--agent all` cannot be combined with individual agent names.
 
+Pricing options:
+
+```bash
+python3 usage_analysis_agent.py --refresh-pricing
+```
+
+The tool always reads `config/pricing.jsonc`; there is no pricing-file CLI override.
+For development checks:
+
+```bash
+python3 -m unittest -v test_pricing.py
+python3 -m py_compile usage_analysis_agent.py
+```
+
 Run `python3 usage_analysis_agent.py --help` for the complete option list.
 
 ## Report sections
@@ -123,21 +137,30 @@ These are intentionally separate metrics. A single user turn may produce multipl
 
 ## Pricing and cost behavior
 
-Pricing is loaded from:
+Pricing configuration is JSONC in `config/pricing.jsonc` (comments and trailing commas are supported).
+`config/pricing.jsonc.sample` documents the supported sources and overrides. Remote sources are
+opt-in through `"enabled": true`. The tool always reads `config/pricing.jsonc`.
+
+Generated caches are stored beside the script:
 
 ```text
-~/.cache/amazon-bedrock-pricing.json
+cache/pricing-aws-bedrock.json
+cache/pricing-models-dev.json
 ```
 
-The cache is refreshed when it is missing or at least seven days old. Refreshing attempts to call:
+Caches contain normalized model prices, source configuration, schema version, and fetch time.
+They are ignored by git and never contain credentials or raw authenticated responses. Fresh caches
+are used offline; stale or missing caches are refreshed. If refresh fails, the last valid cache is
+used and a warning is emitted. `--refresh-pricing` forces a refresh.
 
-```text
-aws pricing get-products --profile use1-sit --region us-east-1 --service-code AmazonBedrock
-```
+Temporary simulation reports, logs, and temporary pricing configurations should be removed after
+use. The repository-level `cache/` files are intentionally retained because they are reusable
+local caches.
 
-The script can still run without the AWS CLI or a successful pricing refresh. Unknown models use the built-in conservative fallback pricing defined in `usage_analysis_agent.py`.
-
-The pricing cache is generated locally and is not part of this project.
+Cost precedence is: recorded OpenCode/Pi cost, explicit config override, exact provider/model
+catalog entries (`models.json`, `models-store.json`, or AWS cache), generic Models.dev pricing,
+then unknown. Unknown prices are reported with `cost_status: "unknown"` and contribute zero to
+numeric totals. Reports include `pricing_source`, `pricing_fetched_at`, and unknown-cost counts.
 
 ## JSON output
 
@@ -179,8 +202,8 @@ The extractor implementations and source assumptions are in:
 - `~/.local/share/opencode/opencode.db`: OpenCode SQLite database
 - `~/.pi/agent/sessions/**/*.jsonl`: Pi session events
 - `~/.codex/sessions/**/*.jsonl`: Codex rollout events
-- `~/.pi/agent/models-store.json`: optional local model pricing metadata
-- `~/.cache/amazon-bedrock-pricing.json`: local pricing cache
+- `~/.pi/agent/models.json` and `~/.pi/agent/models-store.json`: optional local model pricing metadata
+- `cache/pricing-*.json`: generated local pricing caches
 
 The tool does not call agent APIs or upload usage data. It reads local files and SQLite records only, apart from the optional AWS CLI pricing refresh.
 
@@ -188,6 +211,6 @@ The tool does not call agent APIs or upload usage data. It reads local files and
 
 - Counts depend on the event formats emitted by each harness.
 - Historical request/turn/tool-call counts are unavailable when the underlying transcript or event data has been deleted.
-- Cost is an estimate when pricing is unavailable or a model is not recognized.
+- Cost is unknown when pricing is unavailable or a model is not recognized; no silent fallback estimate is applied.
 - OpenCode token totals are sourced from session-level aggregates, while activity counts are sourced from message and part events.
 - The tool does not modify agent history or usage databases.
