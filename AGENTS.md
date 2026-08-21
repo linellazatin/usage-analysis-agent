@@ -4,8 +4,10 @@
 
 - `usage_analysis_agent.py` contains the CLI, extractors, pricing logic, aggregation, reports, and JSON output.
 - `README.md` is the user-facing usage and data-source reference.
+- `config/pricing.jsonc` is the single runtime pricing configuration; `config/pricing.jsonc.sample` documents its format.
+- `test_pricing.py` contains the focused standard-library regression tests for pricing behavior.
 - `usage-all-all.json.sample` shows the shape of generated report data.
-- `.gitignore` excludes local usage exports, Pi data, and Python cache files.
+- `.gitignore` excludes local usage exports, pricing caches, Pi data, and Python cache files.
 - There are no separate source, test, or asset directories. Keep small changes close to the existing module unless a new boundary is justified.
 
 The program reads local Claude Code, OpenCode, Pi, and Codex history. Treat those paths and generated reports as potentially sensitive.
@@ -19,10 +21,14 @@ python3 usage_analysis_agent.py --help        # inspect CLI options
 python3 usage_analysis_agent.py               # analyze detected agents
 python3 usage_analysis_agent.py --days 30     # limit the analysis period
 python3 usage_analysis_agent.py --output report.json
+python3 usage_analysis_agent.py --refresh-pricing # force enabled source refresh
+python3 -m unittest -v test_pricing.py        # focused pricing tests
 python3 -m py_compile usage_analysis_agent.py # syntax check
 ```
 
-Run commands from the repository root. AWS CLI access is optional and only refreshes the local Bedrock pricing cache.
+Run commands from the repository root. The tool always reads `config/pricing.jsonc`; there is no
+pricing-file CLI override. AWS CLI and network access are only needed when enabled sources need
+refreshing. Fresh local caches allow offline analysis.
 
 ## Coding Style & Naming Conventions
 
@@ -34,7 +40,10 @@ Run commands from the repository root. AWS CLI access is optional and only refre
 
 ## Testing Guidelines
 
-There is no automated test suite or coverage requirement. Run `python3 -m py_compile usage_analysis_agent.py` and exercise the affected CLI path with representative local data or a saved sample. Do not commit real usage exports or pricing caches.
+Run `python3 -m unittest -v test_pricing.py`, `python3 -m py_compile usage_analysis_agent.py`,
+and exercise the affected CLI path with representative local data or a saved sample. Tests use
+`TemporaryDirectory()` and must clean up their own temporary files. Do not commit real usage
+exports or generated pricing caches.
 
 ## Commit & Pull Request Guidelines
 
@@ -45,3 +54,8 @@ Pull requests should explain the behavior changed, list validation commands and 
 ## Security & Configuration Tips
 
 Keep credentials, local transcripts, SQLite databases, generated JSON reports, and pricing caches outside version control. Review paths and subprocess changes carefully because the tool reads user data and may invoke the AWS CLI.
+
+Keep `config/pricing.jsonc` free of credentials. Remote source caches contain normalized pricing
+metadata only. Remove temporary simulation reports, logs, and temporary configuration files after
+use; retain repository `cache/pricing-*.json` files because they are the intended reusable local
+caches.
