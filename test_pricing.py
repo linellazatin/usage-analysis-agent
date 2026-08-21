@@ -41,6 +41,37 @@ class PricingTests(unittest.TestCase):
             self.assertEqual(resolver.resolve("provider", "model")["status"], "cached")
             self.assertEqual(resolver.resolve("other", "missing")["status"], "unknown")
 
+    def test_source_priority_selects_lower_number(self):
+        with tempfile.TemporaryDirectory() as temp:
+            resolver = app.PricingResolver(Path(temp) / "pricing.jsonc", Path(temp) / "cache")
+            resolver._add("provider", "model", {"input": 9, "output": 9}, "later", priority=3)
+            resolver._add("provider", "model", {"input": 1, "output": 1}, "earlier", priority=1)
+            self.assertEqual(resolver.resolve("provider", "model")["source"], "earlier")
+
+    def test_pi_models_store_is_configured_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pi_dir = root / ".pi" / "agent"
+            pi_dir.mkdir(parents=True)
+            (pi_dir / "models-store.json").write_text(json.dumps({
+                "provider": {"models": [{
+                    "id": "model",
+                    "cost": {"input": 1, "output": 2},
+                }]}
+            }))
+            config = root / "pricing.jsonc"
+            config.write_text(json.dumps({"sources": {
+                "pi-models-store": {
+                    "enabled": True, "priority": 2, "refreshDays": 15
+                }
+            }}))
+            with patch.object(app.Path, "home", return_value=root):
+                resolver = app.PricingResolver(config, root / "cache")
+            result = resolver.resolve("provider", "model")
+            self.assertEqual(result["source"], "pi-models-store")
+            self.assertEqual(result["pricing"]["output"], 2)
+            self.assertTrue((root / "cache" / "pricing-pi-models-store.json").exists())
+
     @patch("usage_analysis_agent.subprocess.run")
     def test_aws_command_uses_configured_profile_and_region(self, run):
         run.return_value.returncode = 0

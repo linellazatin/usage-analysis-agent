@@ -30,6 +30,12 @@ Run commands from the repository root. The tool always reads `config/pricing.jso
 pricing-file CLI override. AWS CLI and network access are only needed when enabled sources need
 refreshing. Fresh local caches allow offline analysis.
 
+Pricing sources are configured, not hardcoded. Enabled sources are sorted by numeric `priority`
+(lower number wins): recorded Pi/OpenCode costs and explicit overrides still take precedence.
+`pi-models-store` reads `~/.pi/agent/models-store.json` and caches it as
+`cache/pricing-pi-models-store.json`. Use `--refresh-pricing` to refresh all enabled sources; a
+failed refresh must fall back to the last valid cache.
+
 ## Coding Style & Naming Conventions
 
 - Follow the existing four-space Python indentation and standard-library-only approach.
@@ -59,3 +65,7 @@ Keep `config/pricing.jsonc` free of credentials. Remote source caches contain no
 metadata only. Remove temporary simulation reports, logs, and temporary configuration files after
 use; retain repository `cache/pricing-*.json` files because they are the intended reusable local
 caches.
+
+Terminal reports must retain the final `Model Pricing Source: ...` line, including the source and
+cache/catalog path used. Do not claim a remote source supplied pricing when a local catalog or
+recorded usage cost actually won resolution.

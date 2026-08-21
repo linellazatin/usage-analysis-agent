@@ -38,7 +38,7 @@ Agents are auto-detected when their expected local data exists.
 ### Optional
 
 - AWS CLI, if `aws-bedrock` is enabled in `config/pricing.jsonc`
-- Pi `models.json` or `models-store.json` at `~/.pi/agent/`, used as local catalogs
+- Pi `models-store.json` at `~/.pi/agent/`, when `pi-models-store` is enabled
 
 The script uses only Python standard-library modules. There is no `pip install` step and no `requirements.txt`.
 
@@ -145,6 +145,7 @@ Generated caches are stored beside the script:
 
 ```text
 cache/pricing-aws-bedrock.json
+cache/pricing-pi-models-store.json
 cache/pricing-models-dev.json
 ```
 
@@ -157,10 +158,63 @@ Temporary simulation reports, logs, and temporary pricing configurations should 
 use. The repository-level `cache/` files are intentionally retained because they are reusable
 local caches.
 
-Cost precedence is: recorded OpenCode/Pi cost, explicit config override, exact provider/model
-catalog entries (`models.json`, `models-store.json`, or AWS cache), generic Models.dev pricing,
-then unknown. Unknown prices are reported with `cost_status: "unknown"` and contribute zero to
-numeric totals. Reports include `pricing_source`, `pricing_fetched_at`, and unknown-cost counts.
+Cost precedence is: recorded OpenCode/Pi cost, explicit config override, then enabled pricing
+sources ordered by their numeric `priority` (lower number wins), followed by unknown. Unknown
+prices are reported with `cost_status: "unknown"` and contribute zero to numeric totals. Reports include
+`pricing_source`, `pricing_fetched_at`, and unknown-cost counts.
+
+### Configured pricing-source workflow
+
+Enable both sources in the single runtime configuration:
+
+```jsonc
+{
+  "sources": {
+    "aws-bedrock": {
+      "enabled": true,
+      "priority": 1,
+      "profile": "use1-sit",
+      "region": "us-east-1",
+      "refreshDays": 7
+    },
+    "pi-models-store": {
+      "enabled": false,
+      "priority": 2,
+      "refreshDays": 15
+    },
+    "models-dev": {
+      "enabled": true,
+      "priority": 3,
+      "url": "https://models.dev/api.json",
+      "refreshDays": 7
+    }
+  },
+  "overrides": {}
+}
+```
+
+For each run, the tool:
+
+1. Reads enabled sources and their priorities from `config/pricing.jsonc`.
+2. Uses fresh source caches when available.
+3. Refreshes missing or stale enabled caches. Use `--refresh-pricing` to force refreshes.
+4. Fetches AWS pricing with the configured profile and region when `aws-bedrock` is enabled.
+5. Reads Pi’s default `~/.pi/agent/models-store.json` when `pi-models-store` is enabled.
+6. Fetches Models.dev from its configured URL when `models-dev` is enabled.
+7. Resolves each model by exact `provider/model`, then model ID, then normalized model ID.
+8. Uses recorded Pi/OpenCode costs before any configured pricing source.
+
+If multiple enabled sources provide the same unresolved key, the source with the lower
+`priority` wins. A failed source does not fail analysis: the last valid cache is used, or the
+model remains unknown if no cache exists.
+
+Each terminal agent report ends with the source used, for example:
+
+```text
+Model Pricing Source: aws-bedrock (cache/pricing-aws-bedrock.json)
+```
+
+Recorded costs show `recorded (recorded usage data)` instead of a cache path.
 
 ## JSON output
 
@@ -202,7 +256,7 @@ The extractor implementations and source assumptions are in:
 - `~/.local/share/opencode/opencode.db`: OpenCode SQLite database
 - `~/.pi/agent/sessions/**/*.jsonl`: Pi session events
 - `~/.codex/sessions/**/*.jsonl`: Codex rollout events
-- `~/.pi/agent/models.json` and `~/.pi/agent/models-store.json`: optional local model pricing metadata
+- `~/.pi/agent/models-store.json`: input for the configurable `pi-models-store` source
 - `cache/pricing-*.json`: generated local pricing caches
 
 The tool does not call agent APIs or upload usage data. It reads local files and SQLite records only, apart from the optional AWS CLI pricing refresh.
